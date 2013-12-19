@@ -9,7 +9,6 @@ use Pois\ServiceBundle\Entity\EntityInterface;
 use Pois\CommentBundle\Entity\ICommentable;
 use Pois\AttachmentBundle\Entity\IUploadable;
 
-
 /**
  * Abstract service
  *
@@ -48,8 +47,8 @@ abstract class ServiceAbstract
      *
      * @author peterg
      * @param  ContainerInterface $container
-     * @param  EntityManager $entityManager
-     * @param  Paginator $paginator
+     * @param  EntityManager      $entityManager
+     * @param  Paginator          $paginator
      * @return void
      */
     public function __construct(ContainerInterface $container, EntityManager $entityManager, Paginator $paginator, $entityClass)
@@ -63,7 +62,7 @@ abstract class ServiceAbstract
     /**
      * method to delete an entity by id
      *
-     * @param integer $id
+     * @param  integer $id
      * @return void
      */
     public function delete($id)
@@ -77,10 +76,12 @@ abstract class ServiceAbstract
      * method to save or update an address entity
      *
      */
-    public function save(EntityInterface $entity, $force = false)
+    public function save(EntityInterface $entity, $force = false, $flush = true)
     {
         $this->em->persist($entity);
-        $this->em->flush();
+        if ($flush) {
+            $this->em->flush();
+        }
     }
 
     /**
@@ -110,7 +111,7 @@ abstract class ServiceAbstract
     /**
      * method to retreive an entity based on its id
      *
-     * @param integer $addressId
+     * @param  integer $addressId
      * @return Entity
      */
     public function get($id)
@@ -126,7 +127,7 @@ abstract class ServiceAbstract
      * @param [type] $userid  [description]
      * @param [type] $message [description]
      */
-    public function addComment($id, $userid, $message, $isSystem = false)
+    public function addComment($id, $userid, $message, $isSystem = false, $persist = true)
     {
         $implements = class_implements($this->entityClass, true);
 
@@ -153,10 +154,11 @@ abstract class ServiceAbstract
         //attach comment to this object
         $entity->addMessage($comment);
 
-        $this->save($entity, true);
-        $this->container->get('g_service.message')->save($comment);
+        if ($persist) {
+            $this->save($entity, true, $persist);
+            $this->container->get('g_service.message')->save($comment, null, $persist);
+        }
     }
-
 
     /**
      * Add a attachment if connected class implements IUploadable
@@ -191,15 +193,15 @@ abstract class ServiceAbstract
 
     /**
      * Add a notification if connected class implements INotifiable
-     * @param [type] $id      [description]
-     * @param [type] $userid  [description]
+     * @param [type] $id               [description]
+     * @param [type] $userid           [description]
      * @param [type] $notificationType object
-     * @param array $params [stanMinimalny, expiryInDays]
+     * @param array  $params           [stanMinimalny, expiryInDays]
      */
     public function addNotification($id, $userid, $notificationType, $params)
     {
         $implements = class_implements($this->entityClass, true);
-        
+
         if (!isset($implements['Pois\NotificationBundle\Entity\INotifiable'])) {
             throw new \Exception("This service is not implementing INotifiable interface", 1);
         }
@@ -211,7 +213,7 @@ abstract class ServiceAbstract
         } else {
             $user = $this->container->get('security.context')->getToken()?$this->container->get('security.context')->getToken()->getUser():null;
         }
-        
+
         $notification = $this->container->get('g_service.notification')->createNew();
         $notification->setNotificationType($notificationType);
         $notification->setParameters($params);
@@ -224,11 +226,10 @@ abstract class ServiceAbstract
         $this->container->get('g_service.notification')->save($notification);
     }
 
-
     /**
      * get object for given notification
      * @param  [type] $notificationId [description]
-     * @return [type]                 [description]
+     * @return [type] [description]
      */
     public function getForNotification($notificationId)
     {
@@ -240,7 +241,6 @@ abstract class ServiceAbstract
 
         return $this->em
             ->getRepository($this->entityClass)
-            ->findByNotification($notificationId);        
+            ->findByNotification($notificationId);
     }
 }
-
